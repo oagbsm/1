@@ -1,5 +1,7 @@
 // lib/recommendations.ts
 import { orders, products } from "@/data/store";
+import { coPurchaseCounts } from "@/data/store";
+
 
 type CartItem = { product_id: number; qty: number };
 

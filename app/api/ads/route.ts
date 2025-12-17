@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
 
 export function GET() {
-  return NextResponse.json({ status: "metrics API online" });
+  return NextResponse.json({ status: "ads API online" });
 }
