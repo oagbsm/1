@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState } from "react";
+import { gtag } from "@/lib/gtag"; // ✅ import
 
 export type CartItem = {
   product_id: number;
@@ -13,7 +14,7 @@ export type CartContextType = {
   addToCart: (item: CartItem) => void;
   removeFromCart: (index: number) => void;
   updateQty: (index: number, qty: number) => void;
-  clearCart: () => void; // ✅ Add this
+  clearCart: () => void;
 };
 
 const CartContext = createContext<CartContextType | null>(null);
@@ -22,9 +23,25 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
 
   function addToCart(item: CartItem) {
-    setItems(prev => {
+    // ⬇️ GA4 EVENT FIRE HERE
+    gtag("event", "add_to_cart", {
+      currency: "USD",
+      value: 0, // optional — GA4 recommends value, but it's okay to leave 0
+      items: [
+        {
+          item_id: item.product_id,
+          item_variant: item.variant_id ?? null,
+          quantity: item.qty,
+        },
+      ],
+    });
+
+    // ⬇️ Your existing logic
+    setItems((prev) => {
       const existingIndex = prev.findIndex(
-        i => i.product_id === item.product_id && i.variant_id === item.variant_id
+        (i) =>
+          i.product_id === item.product_id &&
+          i.variant_id === item.variant_id
       );
 
       if (existingIndex !== -1) {
@@ -38,17 +55,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }
 
   function removeFromCart(index: number) {
-    setItems(prev => prev.filter((_, i) => i !== index));
+    setItems((prev) => prev.filter((_, i) => i !== index));
   }
 
   function updateQty(index: number, qty: number) {
-    setItems(prev =>
+    setItems((prev) =>
       prev.map((item, i) => (i === index ? { ...item, qty } : item))
     );
   }
 
   function clearCart() {
-    setItems([]); // ✅ Clear all items
+    setItems([]);
   }
 
   return (
