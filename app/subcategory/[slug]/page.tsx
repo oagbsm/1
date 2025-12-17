@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { Heart } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useCart } from "@/context/CartContext";
 import {
@@ -15,6 +15,7 @@ import {
 } from "@/data/store";
 
 import { getAvailableStock } from "@/lib/stock";
+import { gtagEvent } from "@/lib/analytics"; // ✅ GA helper
 
 const IMG = "/example.png";
 
@@ -35,17 +36,38 @@ export default function SubcategoryPage() {
   if (!subcategory) return <div className="p-6">Subcategory not found</div>;
 
   const category = categories.find((c) => c.id === subcategory.category_id);
-  const subcategoryProducts = products.filter((p) => p.subcategory_id === subcategory.id);
+  const subcategoryProducts = products.filter(
+    (p) => p.subcategory_id === subcategory.id
+  );
   const siblingSubcategories = subcategories.filter(
     (s) => s.category_id === subcategory.category_id
   );
+
+  // ✅ GA4: view_item_list (list of products in this subcategory)
+  useEffect(() => {
+    if (!subcategoryProducts.length) return;
+
+    gtagEvent("view_item_list", {
+      item_list_name: subcategory.name,
+      item_list_id: subcategory.id,
+      items: subcategoryProducts.map((p) => ({
+        item_id: p.id,
+        item_name: p.name,
+        item_category: category?.name,
+        item_category2: subcategory.name,
+        price: p.base_price,
+      })),
+    });
+  }, [subcategory.id, subcategory.name, category?.name, subcategoryProducts]);
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-[#0A7C9E] px-3 py-2 text-white">
         <div className="flex items-center gap-2">
-          <span onClick={() => router.back()} className="cursor-pointer">⬅</span>
+          <span onClick={() => router.back()} className="cursor-pointer">
+            ⬅
+          </span>
           <input
             placeholder={`Search ${subcategory.name}`}
             className="flex-1 rounded-md px-3 py-2 text-sm text-black"
@@ -81,9 +103,29 @@ export default function SubcategoryPage() {
               key={p.id}
               productId={p.id}
               onOpen={() => router.push(`/product/${p.slug}`)}
-              onAdd={(variantId) =>
-                addToCart({ product_id: p.id, variant_id: variantId, qty: 1 })
-              }
+              onAdd={(variantId) => {
+                // 1) your cart logic
+                addToCart({ product_id: p.id, variant_id: variantId, qty: 1 });
+
+                // 2) GA4 add_to_cart
+                const variant = productVariants.find((v) => v.id === variantId);
+                const price = variant?.price ?? p.base_price;
+
+                gtagEvent("add_to_cart", {
+                  currency: "USD",
+                  value: price,
+                  items: [
+                    {
+                      item_id: p.id,
+                      item_name: p.name,
+                      item_category: category?.name,
+                      item_category2: subcategory.name,
+                      price,
+                      quantity: 1,
+                    },
+                  ],
+                });
+              }}
             />
           ))}
         </div>
@@ -136,7 +178,9 @@ function ProductCard({
 
       <div className="text-xs mt-1 line-clamp-2">{p.name}</div>
       <div className="font-semibold mt-1">${price}</div>
-      {p.is_discounted && <div className="text-red-500 text-xs">Discount</div>}
+      {p.is_discounted && (
+        <div className="text-red-500 text-xs">Discount</div>
+      )}
 
       {/* ✅ Stock */}
       {available !== null && (
@@ -158,7 +202,9 @@ function ProductCard({
                 selectedVariantId === v.id
                   ? "border-green-600 bg-green-50"
                   : "border-gray-300"
-              } ${v.stock === 0 ? "opacity-40 cursor-not-allowed" : ""}`}
+              } ${
+                v.stock === 0 ? "opacity-40 cursor-not-allowed" : ""
+              }`}
             >
               {v.name}
             </button>

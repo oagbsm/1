@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Heart, Minus, Plus, Share2 } from "lucide-react";
 
 import { useCart } from "@/context/CartContext";
@@ -20,6 +20,7 @@ import { loadUserProfile, saveUserProfile } from "@/data/user";
 import { getAlsoBoughtFromCounts } from "@/lib/coPurchase";
 import { getAvailableStock } from "@/lib/stock";
 import { getVariantImageUrl } from "@/lib/variantImage";
+import { gtagEvent } from "@/lib/analytics"; // ✅ GA helper
 
 const IMG = "/example.png";
 
@@ -57,7 +58,8 @@ export default function ProductPage() {
 
   // ✅ Single image: variant image when toggled, else primary product image
   const baseImg =
-    productImages.find((i) => i.product_id === product.id && i.is_primary)?.url ||
+    productImages.find((i) => i.product_id === product.id && i.is_primary)
+      ?.url ||
     productImages.find((i) => i.product_id === product.id)?.url ||
     IMG;
 
@@ -86,6 +88,23 @@ export default function ProductPage() {
     }
     saveUserProfile(profile);
   }
+
+  // ✅ GA4: view_item
+  useEffect(() => {
+    gtagEvent("view_item", {
+      currency: "USD",
+      value: price,
+      items: [
+        {
+          item_id: product.id,
+          item_name: product.name,
+          item_category: category?.name,
+          item_category2: subcategory?.name,
+          price,
+        },
+      ],
+    });
+  }, [product.id, price, category?.name, subcategory?.name]);
 
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
@@ -201,12 +220,29 @@ export default function ProductPage() {
         <button
           disabled={outOfStock}
           onClick={() => {
+            // 1) add to cart
             addToCart({
               product_id: product.id,
               variant_id: selectedVariant?.id ?? null,
               qty,
             });
             logAddToCartInterest(product.id, product.subcategory_id);
+
+            // 2) GA4 add_to_cart
+            gtagEvent("add_to_cart", {
+              currency: "USD",
+              value: price * qty,
+              items: [
+                {
+                  item_id: product.id,
+                  item_name: product.name,
+                  item_category: category?.name,
+                  item_category2: subcategory?.name,
+                  price,
+                  quantity: qty,
+                },
+              ],
+            });
           }}
           className={`flex-1 rounded-md py-2 font-semibold ${
             outOfStock
